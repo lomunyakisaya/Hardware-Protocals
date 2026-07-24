@@ -90,10 +90,10 @@ String buildWebPage() {
   <div class="grid">
     <div class="card"><span class="label">Joystick X</span><div class="value" id="joyX">0</div></div>
     <div class="card"><span class="label">Joystick Y</span><div class="value" id="joyY">0</div></div>
-    <div class="card"><span class="label">Speed</span><div class="value" id="speed">0</div></div>
-    <div class="card"><span class="label">Distance</span><div class="value" id="distance">0</div></div>
+    <div class="card"><span class="label">Throttle</span><div class="value" id="speed">0%</div></div>
+    <div class="card"><span class="label">Obstacle Ahead</span><div class="value" id="distance">0 cm</div></div>
     <div class="card"><span class="label">Servo</span><div class="value" id="servo">0</div></div>
-    <div class="card"><span class="label">Status</span><div class="value" id="status">idle</div></div>
+    <div class="card"><span class="label">Flight State</span><div class="value" id="status">idle</div></div>
   </div>
 
   <div id="connectionState" class="status">Waiting for drone telemetry…</div>
@@ -123,6 +123,7 @@ String buildWebPage() {
     };
 
     let lastUpdate = 0;
+    const obstacleThreshold = 50;
 
     function setConnectionState(text, mode) {
       connectionState.textContent = text;
@@ -137,9 +138,11 @@ String buildWebPage() {
 
     function drawDrone() {
       const centerX = 260 + (visualData.joystickX - 512) / 14;
-      const centerY = 140 + (visualData.joystickY - 512) / 14;
+      const centerY = 140 + (512 - visualData.joystickY) / 14;
       const tilt = (visualData.servo - 90) * 0.75;
       const altitude = Math.max(40, 152 - visualData.distance * 2);
+      const obstacleColor = visualData.distance < obstacleThreshold ? '#f87171' : '#4ade80';
+      const obstacleBarWidth = Math.max(20, Math.min(220, visualData.distance * 4));
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = '#08111f';
@@ -166,6 +169,14 @@ String buildWebPage() {
       ctx.moveTo(20, 150);
       ctx.lineTo(500, 150);
       ctx.stroke();
+
+      ctx.strokeStyle = obstacleColor;
+      ctx.setLineDash([6, 6]);
+      ctx.beginPath();
+      ctx.moveTo(260, 150);
+      ctx.lineTo(260, 40);
+      ctx.stroke();
+      ctx.setLineDash([]);
 
       ctx.save();
       ctx.translate(centerX, centerY);
@@ -197,6 +208,12 @@ String buildWebPage() {
       ctx.fillStyle = '#60a5fa';
       ctx.fillRect(108, altitude - 18, 8, 18);
       ctx.fillRect(114, altitude - 12, 8, 12);
+
+      ctx.fillStyle = obstacleColor;
+      ctx.fillRect(230, 38, obstacleBarWidth, 8);
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = '12px Arial';
+      ctx.fillText('Estimated obstacle ahead', 220, 34);
     }
 
     function animate() {
@@ -214,12 +231,16 @@ String buildWebPage() {
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
 
+        const distance = Number(data.distance || 0);
+        const speedPercent = Math.round((Number(data.speed || 0) / 1023) * 100);
+        const riskLabel = distance < obstacleThreshold ? 'Caution' : 'Clear';
+
         document.getElementById('joyX').textContent = data.joystickX;
         document.getElementById('joyY').textContent = data.joystickY;
-        document.getElementById('speed').textContent = data.speed;
-        document.getElementById('distance').textContent = data.distance;
+        document.getElementById('speed').textContent = speedPercent + '%';
+        document.getElementById('distance').textContent = distance + ' cm';
         document.getElementById('servo').textContent = data.servo;
-        document.getElementById('status').textContent = data.status;
+        document.getElementById('status').textContent = riskLabel + ' • ' + (data.status || 'idle');
 
         liveData.joystickX = Number(data.joystickX || 0);
         liveData.joystickY = Number(data.joystickY || 0);

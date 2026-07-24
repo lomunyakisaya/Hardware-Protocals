@@ -46,18 +46,39 @@ void updateRgb(uint8_t r, uint8_t g, uint8_t b) {
   analogWrite(RGB_BLUE_PIN, b);
 }
 
-void updateOled(int joystickX, int joystickY, int speedPot, int distance) {
+void drawDroneOnOled(int joystickX, int joystickY, int servoAngle, int distance, int speedPot) {
+  int droneX = map(joystickX, 0, 1023, 10, 118);
+  int droneY = map(joystickY, 0, 1023, 12, 56);
+  int altitude = constrain(52 - distance * 2, 8, 52);
+  int tilt = map(servoAngle, 0, 180, -10, 10);
+
   display.clearDisplay();
-  display.setCursor(0, 0);
-  display.print("JOY X:");
-  display.println(joystickX);
-  display.print("JOY Y:");
-  display.println(joystickY);
+
+  display.drawRect(0, 0, OLED_WIDTH, OLED_HEIGHT, WHITE);
+  display.drawLine(0, 58, OLED_WIDTH, 58, WHITE);
+  display.drawLine(0, 60, OLED_WIDTH, 60, WHITE);
+
+  display.setCursor(2, 2);
   display.print("SPEED:");
-  display.println(speedPot);
+  display.print(speedPot);
+  display.setCursor(2, 12);
   display.print("DIST:");
-  display.println(distance);
+  display.print(distance);
+
+  display.drawLine(droneX - tilt, droneY, droneX + tilt, droneY, WHITE);
+  display.drawLine(droneX - tilt, droneY - 6, droneX + tilt, droneY + 6, WHITE);
+  display.drawLine(droneX + 4, droneY - 6, droneX + 10, droneY - 12, WHITE);
+  display.drawLine(droneX - 4, droneY - 6, droneX - 10, droneY - 12, WHITE);
+  display.drawRect(droneX - 9, droneY - 5, 18, 10, WHITE);
+  display.fillRect(droneX - 4, droneY - 2, 8, 4, WHITE);
+  display.drawLine(droneX, droneY, droneX, altitude + 3, WHITE);
+  display.drawRect(86, altitude, 30, 4, WHITE);
+
   display.display();
+}
+
+void updateOled(int joystickX, int joystickY, int speedPot, int distance, int servoAngle) {
+  drawDroneOnOled(joystickX, joystickY, servoAngle, distance, speedPot);
 }
 
 void sendSensorReadings() {
@@ -78,7 +99,7 @@ void sendSensorReadings() {
   Serial3.println();
 
   droneServo.write(servoAngle);
-  updateOled(joystickX, joystickY, speedPot, distance);
+  updateOled(joystickX, joystickY, speedPot, distance, servoAngle);
 }
 
 void setup() {
